@@ -57,13 +57,19 @@ def transitLuminosity(pm, angleDeg):
     yp = pm.orbitalRadius * np.sin(angle) * np.tan(pm.inclination*np.pi/180)
     # distance from the star as viewed
     rp2 = xp*xp + yp*yp
+    # scale the planet radius, which is in units of Jupiter radius, to solar radius where
+    # R star = 1
+    planRad = 0.1 * pm.planetRadius 
+    # and then normalize to the star radius
+    planRad /= pm.starRadius
     # planet radius^2
-    pr2 = pm.planetRadius * pm.planetRadius
+    pr2 = planRad * planRad
     if (pm.starLuminosity > 0 and pm.planetLuminosity >= 0):
-        transitRadius2 = (1 + pm.planetRadius) * (1 + pm.planetRadius) 
+        transitRadius2 = (1 + planRad) * (1 + planRad) 
         # return with the star + planet Luminosity if this is NOT a transit
         if (rp2 > transitRadius2): return pm.starLuminosity + pm.planetLuminosity
     step = 0.01
+    if(planRad < 0.08): step = 0.005
     # iterate over the full star surface in a rectangular grid of points with size step. The
     # variable sdl (star disk luminosity) is the sum of all star or planet Luminosity points
     #  within the star disk
@@ -86,10 +92,9 @@ def transitLuminosity(pm, angleDeg):
                 # distance^2 from star center
                 rs2 = xs*xs + ys*ys
                 cnts += 1
-                # See is outside the planet disk
+                # See if this point is outside the planet disk
                 if (rp2 > pr2):
                     # This point is outside the planet disk.
-                    # Find the distance^2 to the star center so we can apply limb-darkening
                     sdl += limbDarkFactor(pm, rs2)
                 else:
                     # This point is inside the planet disk
@@ -102,16 +107,18 @@ def transitLuminosity(pm, angleDeg):
             xs += step
         # We are done if the planet is indeed dark. Now add the light from a non-dark "planet", aka
         # a secondary star
-        # normalize
+        # normalize to the number of grid points
         sdl /= cnts
+        # normalize to the star area
+#        sdl *= pm.starRadius * pm.starRadius
         if (isPlanet):
             return sdl
     # sum the planet disk Luminosity for points that are outside the star disk
     pdl = 0
     cntp= 0
     # Iterate over the grid of points in the "planet" disk
-    x = -pm.planetRadius
-    while (x < pm.planetRadius):
+    x = -planRad
+    while (x < planRad):
         ymax = np.sqrt(pr2 - x*x)
         y = -ymax
         while (y < ymax):
@@ -130,8 +137,8 @@ def transitLuminosity(pm, angleDeg):
             y += step
         x += step
     # normalize by planet area
-    if (cntp > 0): pdl *= pr2 /cntp
-#    print(angleDeg,"cntp ",cntp, "sdl {:.3f}".format((sdl)), "pdl {:.3f}".format((pdl)))
+#    if (cntp > 0): pdl *= pr2 /cntp
+    if (cntp > 0): pdl /= cntp
     return (sdl + pdl)
 
 def doOrbit(pm, angles, intensities):
