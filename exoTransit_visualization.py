@@ -25,7 +25,7 @@ planRad = 1.0 # Jupiter radii
 planLum = 0.
 inclin = 10
 ldf = 0.4
-noise = 0.001
+noise = 0.0005
 # create the system model
 pm = SystemModel(
     starRad, 
@@ -101,7 +101,7 @@ class App_Window(tkinter.Tk):
         # noise
         ypo += 25
         self.lbl6 = tkinter.Label(self, text = "Noise rms")
-        self.lbl61 = tkinter.Label(self, text = "typically 0.001")
+        self.lbl61 = tkinter.Label(self, text = "typically 0.0005")
         self.noiseEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=noise), width = 8)
         self.lbl6.place(x=xpo1, y=ypo)
         self.noiseEntry.place(x=xpo2, y=ypo)
@@ -221,7 +221,10 @@ class App_Window(tkinter.Tk):
         yp = pm.orbitalRadius * np.tan(pm.inclination*np.pi/180) + 0.1 * pm.planetRadius
         pre = 9.73 * pm.starRadius * np.sqrt(self.luminosities[0] - self.luminosities[14])
         pre *= 1.06 # correction for grid size error
-        self.planRadEntryEstTxt.configure(text="Estimated planet radius is {:.1f} x Jupiter radius using the flux dip and Rstar".format(pre))
+        if yp < pm.starRadius:
+            self.planRadEntryEstTxt.configure(text="Estimated planet radius is {:.1f} x Jupiter radius using the flux dip and Rstar".format(pre))
+        else:
+            self.planRadEntryEstTxt.configure(text="Planet radius cannot be estimated because it is not fully within the star disk")
     def run(self):
         # Validate the inputs, run the model and update the screen with the results.
         # Validate the user inputs and put them in the system model
