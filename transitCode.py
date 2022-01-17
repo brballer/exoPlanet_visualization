@@ -109,8 +109,6 @@ def transitLuminosity(pm, angleDeg):
         # a secondary star
         # normalize to the number of grid points
         sdl /= cnts
-        # normalize to the star area
-#        sdl *= pm.starRadius * pm.starRadius
         if (isPlanet):
             return sdl
     # sum the planet disk Luminosity for points that are outside the star disk
@@ -136,26 +134,15 @@ def transitLuminosity(pm, angleDeg):
                 pdl += limbDarkFactor(pm, rp2/pr2) * pm.planetBrightness
             y += step
         x += step
-    # normalize by planet area
-#    if (cntp > 0): pdl *= pr2 /cntp
-    if (cntp > 0): pdl /= cntp
+    # normalize by planet disk area / star disk area
+    if (cntp > 0): pdl *= pr2 /cntp
     return (sdl + pdl)
 
 def doOrbit(pm, angles, intensities):
     # The star is located at (0,0,0). The planet moves in a circular orbit in the Z = 0 plane and
     # is viewed by us by a 2D coordinate system which is a projection of the 3D system rotated by
     # the inclination angle around the Y axis. 
-    # Number of points to calculate for a full orbital period
-    nBins = 60
-    if (angles.size != nBins):
-        np.resize(angles, nBins)
-        np.resize(intensities, nBins)
-    # the starting angle is chosen so that the planet is at the minimum X position, at -orbitalRadius
-    angle0 = 0
-    step = 360 / nBins
     indx = 0
-    for iang in range(nBins):
-        angle = angle0 + iang * step
-        angles[indx]=angle
+    for angle in angles:
         intensities[indx]=transitLuminosity(pm, angle)
         indx += 1

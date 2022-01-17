@@ -23,3 +23,4 @@ class SystemModel():
         # mask off the star light to measure the planet luminosity
         self.maskStar = False
         self.noise = 0.
+        self.needsUpdate = True
