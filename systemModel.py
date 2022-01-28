@@ -8,32 +8,28 @@ class SystemModel():
         # The star has a radius of 1 and a central brightness of 1. The integrated star luminosity is reduced if a
         # limb-darkening factor LDF is > 0. A "planet" in the code is a true planet if the planetBrightness = 0.
         # Eclipsing binary stars are modeled by setting planetBrightness > 0. 
-        self.systemImage = np.zeros((512,1024), np.uint8)
-        self.starImage = np.zeros((512,1024), np.uint8)
-        self.planetImage = np.zeros((512,512), np.uint8)
-        self.starRadius = starRadIn # in units of RSun
-        self.starRadiusOld = -1.
-        self.planetRadius = planRadIn # in units of RSun
-        self.planetRadiusOld = -1.
-        self.orbitalRadius = orbRadIn # in units of RSun
-        self.orbitalRadiusOld = -1.
+        self.systemImage = np.zeros((256,512), np.uint8)
+        self.starImage = np.zeros((256,512), np.uint8)
+        self.planetImage = np.zeros((256,256), np.uint8)
+        self.starRadius = np.double(starRadIn) # in units of RSun
+        self.planetRadius = np.double(planRadIn) # in units of RSun
+        self.orbitalRadius = np.double(orbRadIn) # in units of RSun
         # brightness is the amount of light emitted per unit area
         self.planetBrightness = planBrightIn
-        self.planetBrightnessOld = -1
         # limb-darkening factor
         self.LDF = ldfIn
         self.LDFOld = -1
         self.inclination = inclinIn # in degrees
-        self.inclinationOld = -1
-        self.stepSize = 0.00488281 # for mapping cartesian (x,y) to pixel
-        self.zoomState = 0 # 0 = none, 1 = primary transity, 2 = secondary transit
+        self.stepSize = np.double(5.0/512) # The cartoon is 5 R_Sun wide with 512 pixels
+        self.luminosityNorm= np.double(-1.)
+        self.luminosity90 = np.double(-1.)
+        self.nAngleBins = 60
+        self.zoomState = 0 # 0 = none, 1 = primary transit, 2 = secondary transit
+        self.featureState = 0 # 0 = none, 1 = circumsecondary disk, etc
         # Luminosity is the total amount of light emitted. These can't be determined until the
         # system model is defined by the user.
-        self.starLuminosity = -1
-        self.planetLuminosity = -1
+        self.starLuminosity = np.double(-1.)
+        self.planetLuminosity = np.double(-1.)
+        self.systemLuminosity = np.double(-1.) # this is the total luminosity at a specifc orbit angle
         self.noise = 0.
-        self.starImageOK = False # set true if the image needs updating
-        self.planetImageOK = False
-        self.systemImageOK = False
-        self.F2CartoonOK = False
 
