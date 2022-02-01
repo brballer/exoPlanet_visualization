@@ -1,5 +1,10 @@
 # exoPlanet_visualization
-A Python based tool for visualizing transit curves of exoplanets and eclipsing binary star systems.
+A Python based tool for visualizing transit curves of exoplanets and eclipsing binary star systems. The major improvements of this version are 
+
+* A star system animation
+* Option to include a circumsecondary dust disk
+* Speed improvements
+* Option to bulk-load model inputs
 
 ### Intended audience
 Citizen scientists who would like to understand what causes features of transit curves, for example those involved with PlanetHunters NGTS.
