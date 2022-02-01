@@ -8,18 +8,20 @@ class SystemModel():
         # The star has a radius of 1 and a central brightness of 1. The integrated star luminosity is reduced if a
         # limb-darkening factor LDF is > 0. A "planet" in the code is a true planet if the planetBrightness = 0.
         # Eclipsing binary stars are modeled by setting planetBrightness > 0. 
-        self.systemImage = np.zeros((256,512), np.uint8)
-        self.starImage = np.zeros((256,512), np.uint8)
-        self.planetImage = np.zeros((256,256), np.uint8)
+        self.systemImage = np.zeros((256,512), np.uint16)
+        self.starImage = np.zeros((256,512), np.uint16)
+        self.planetImage = np.zeros((256,256), np.uint16)
         self.starRadius = np.double(starRadIn) # in units of RSun
-        self.planetRadius = np.double(planRadIn) # in units of RSun
-        self.orbitalRadius = np.double(orbRadIn) # in units of RSun
-        # brightness is the amount of light emitted per unit area
-        self.planetBrightness = planBrightIn
-        # limb-darkening factor
-        self.LDF = ldfIn
-        self.LDFOld = -1
-        self.inclination = inclinIn # in degrees
+        self.planRadius = np.double(planRadIn) # in units of RSun
+        self.planOrbitRadius = np.double(orbRadIn) # in units of RSun
+        self.planBright = planBrightIn
+        self.LDF = np.float(ldfIn)
+        self.inclination = np.float(inclinIn) # in degrees
+        self.diskOuterRadius = 0
+        self.diskInnerRadius = 0
+        self.diskBright = 0
+        self.diskInclination = 0 # degrees
+        self.diskOrbitAngle = 0
         self.stepSize = np.double(5.0/512) # The cartoon is 5 R_Sun wide with 512 pixels
         self.luminosityNorm= np.double(-1.)
         self.luminosity90 = np.double(-1.)

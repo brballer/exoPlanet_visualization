@@ -15,6 +15,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg)
 from matplotlib.ticker import (MultipleLocator)
 from systemModel import SystemModel
+from os.path import exists
 import time
 
 # planet radius RJupiter to RSun
@@ -25,10 +26,11 @@ pm = SystemModel(
     1.0, # star radius in units of Solar radius
     2.0, # planet orbital radius in units of R_Star
     1.0 * RJupiterToRSun, # planet radius in units of Jupiter radius
-    0.0, # planet luminosity(0 = planet, > 1 eclipsing binary star)
-    0, # inclination view angle (degrees) 
+    0.8, # planet luminosity(0 = planet, > 1 eclipsing binary star)
+    15.0, # inclination view angle (degrees) 
     0.5 # star limb-darkening factor (0 = none)
     )
+
 
 class App_Window(tkinter.Tk):
     def __init__(self, parent):
@@ -36,14 +38,57 @@ class App_Window(tkinter.Tk):
         self.initialize()
     def appQuit(self):
         sys.exit()
+    def loadInputs(self):
+        # Load the model inputs from a local text file.
+        # First ensure that the modelInputs file exists
+        if exists("modelInputs.txt"):
+            inFile = open("modelInputs.txt","r")
+            for line in inFile:
+                # ignore comment lines
+                if line.index('#') == 0:
+                    continue
+                split1 = line.split('#')
+                split2 = split1[0].split(':')
+                if line.startswith('diskOuterRadius'):
+                    pm.diskOuterRadius = float(split2[1])
+                elif line.startswith('diskInnerRadius'):
+                    pm.diskInnerRadius = float(split2[1])
+                elif line.startswith('diskBright'):
+                    pm.diskBright = float(split2[1])
+                elif line.startswith('diskInclination'):
+                    pm.diskInclination = float(split2[1])
+                elif line.startswith('diskOrbitAngle'):
+                    pm.diskOrbitAngle = float(split2[1])
+                elif line.startswith('planRadius'):
+                    pr = float(split2[1])
+                    pm.planRadius = pr*RJupiterToRSun
+                    self.planRadEntry.config(textvariable=tkinter.StringVar(value=pr))
+                elif line.startswith('planOrbitRadius'):
+                    pm.planOrbitRadius = float(split2[1])
+                    self.planOrbitRadiusEntry.config(textvariable = tkinter.StringVar(value=pm.planOrbitRadius))
+                elif line.startswith('planBright'):
+                    pm.planBright = float(split2[1])
+                    self.planBrightEntry.config(textvariable = tkinter.StringVar(value=pm.planBright))
+                elif line.startswith('starRadius'):
+                    pm.starRadius = float(split2[1])
+                    self.starRadEntry.config(textvariable=tkinter.StringVar(value=pm.starRadius))
+                elif line.startswith('LDF'):
+                    pm.LDF = float(split2[1])
+                    self.ldfEntry.config(textvariable=tkinter.StringVar(value=pm.LDF))
+                else:
+                    print("unrecognized line",line)
+            inFile.close()
+            print("Loaded system model inputs from 'modelInputs.txt'")
+            self.plotLDF()
+            self.resetCanvas2()
     def initialize(self):
-        self.title("ExoTransit_Visualization V1.1")
-        self.geometry("1000x800")
+        self.title("ExoTransit_Visualization V2.0")
+        self.geometry("1100x800")
+        # scaling from brightness to pixel value = uint16/2
+        self.pixelScale = 65535
         # define arrays for the orbital angle and the total luminosity
-        nBins = 60
         pm.systemLuminosity = pm.starLuminosity + pm.planetLuminosity
-#        self.angles = np.zeros(nBins,float)
-        self.luminosities = np.zeros(nBins, float)
+        self.luminosities = np.zeros(pm.nAngleBins, float)
         # the starting angle is chosen so that the planet is at the minimum X position, at -orbitalRadius
         step = 360./pm.nAngleBins
         self.angles = np.arange(0.,360.,step,float)
@@ -71,8 +116,8 @@ class App_Window(tkinter.Tk):
         ypo += 25
         self.lbl3 = tkinter.Label(self, text = "Planet radius (R_planet)")
         self.lbl31 = tkinter.Label(self, text = "R_Jupiter. (R_Jupiter= 0.1 R_Sun)")
-        self.planRadEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=pm.planetRadius/RJupiterToRSun), width = 8)
-        self.planRadEntry.bind("<Return>",self.validatePlanetRadius)
+        self.planRadEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=pm.planRadius/RJupiterToRSun), width = 8)
+        self.planRadEntry.bind("<Return>",self.validatePlanRadius)
         self.lbl3.place(x=xpo1, y=ypo)
         self.planRadEntry.place(x=xpo2, y=ypo)
         self.lbl31.place(x=xpo3, y=ypo)
@@ -80,17 +125,17 @@ class App_Window(tkinter.Tk):
         ypo += 25
         self.lbl2 = tkinter.Label(self, text = "Planet orbital radius")
         self.lbl21 = tkinter.Label(self, text = "R_Star. Note: R_Mercury = 83 R_Sun")
-        self.orbRadEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=pm.orbitalRadius), width = 8)
-        self.orbRadEntry.bind("<Return>",self.validateOrbitalRadius)
+        self.planOrbitRadiusEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=pm.planOrbitRadius), width = 8)
+        self.planOrbitRadiusEntry.bind("<Return>",self.validatePlanOrbitRadius)
         self.lbl2.place(x=xpo1, y=ypo)
-        self.orbRadEntry.place(x=xpo2, y=ypo)
+        self.planOrbitRadiusEntry.place(x=xpo2, y=ypo)
         self.lbl21.place(x=xpo3, y=ypo)
         #
         ypo += 25
         self.lbl4 = tkinter.Label(self, text = "Planet central brightness")
         self.lbl41 = tkinter.Label(self, text = "0 for planet or >0 for a binary companion star\u2020")
-        self.planBrightEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=pm.planetBrightness), width = 8)
-        self.planBrightEntry.bind("<Return>",self.validatePlanetBrightness)
+        self.planBrightEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=pm.planBright), width = 8)
+        self.planBrightEntry.bind("<Return>",self.validatePlanBright)
         self.lbl4.place(x=xpo1, y=ypo)
         self.planBrightEntry.place(x=xpo2, y=ypo)
         self.lbl41.place(x=xpo3, y=ypo)
@@ -127,11 +172,14 @@ class App_Window(tkinter.Tk):
         self.featurebutton=tkinter.Button(self, textvariable=self.featureText, command=self.addFeature)
         self.featurebutton.place(x=xpo1+200, y=ypo)
         # quit button at the top
-        self.b3=tkinter.Button(self, text='Quit', command=self.appQuit)
+        self.b3=tkinter.Button(self, text="Quit", command=self.appQuit)
         self.b3.pack(anchor="nw")
+        self.b4=tkinter.Button(self, text="Load inputs", command=self.loadInputs)
+        self.b4.place(x=190,y=0)
+        # read in system inputs
         # add some informational text fields
         ypo += 30
-        daggerTxt = tkinter.Label(self, text = "\u2020 Note: Star central brightness, B(r=0), is defined to be 1.  (Luminosity = \u222B B(r) LDF(r) dA)")
+        daggerTxt = tkinter.Label(self, text = "\u2020 Note: Star central brightness, B(r=0) = 0, by definition.  (Luminosity = \u222B B(r) LDF(r) dA)")
         daggerTxt.place(x=xpo1, y=ypo)
         ypo += 20
         self.starLumTxt = tkinter.Label(self, text = "Star luminosity = UNDEFINED")
@@ -144,7 +192,7 @@ class App_Window(tkinter.Tk):
         ypo += 20
         self.ang90LumTxt = tkinter.Label(self, text = "System luminosity(90 deg) = UNDEFINED")
         self.ang90LumTxt.place(x=xpo1, y=ypo)
-        self.dipTxt = tkinter.Label(self, text = "Luminosity dip = UNDEFINED")
+        self.dipTxt = tkinter.Label(self, text = "Normalized luminosity dip = UNDEFINED")
         self.dipTxt.place(x=xpo1+250, y=ypo)
         # add the Brightness vs Radius figure
         Fig = Figure(figsize=(5.5,3.5),dpi=100)
@@ -171,7 +219,7 @@ class App_Window(tkinter.Tk):
         self.updateStarImage(pm)
         self.updatePlanetImage(pm)
         self.updateSystemImage(pm,0)
-        self.ims = self.F2Cartoon.imshow(pm.systemImage, cmap="gray", vmin=0, vmax=255)
+        self.ims = self.F2Cartoon.imshow(pm.systemImage, cmap="gray", vmin=0, vmax=65535)
         self.F2Cartoon.axis("off")
         self.F2Transit = Fig2.add_subplot(212)
         self.F2Transit.autoscale(True,axis='both',tight=True)
@@ -183,7 +231,7 @@ class App_Window(tkinter.Tk):
         self.UpdateRunInfo()
         # finish up
         self.resizable(True, True)
-        self.update()
+#        self.update()
     def UpdateRunInfo(self):
         # Updates the detailed results below the Run button
         self.starLumTxt.configure(text="Star luminosity = {:.4f}".format(pm.starLuminosity))
@@ -194,13 +242,17 @@ class App_Window(tkinter.Tk):
         pm.luminosity90 = pm.systemLuminosity
         self.ang90LumTxt.configure(text="System luminosity(90 deg) = {:.4f}".format(pm.luminosity90))
         dip = np.double((lumMax - pm.luminosity90) / lumMax)
-        self.dipTxt.configure(text="Luminosity dip = {:.4f}".format(dip))
+        self.dipTxt.configure(text="Normalized luminosity dip = {:.4f}".format(dip))
         # move the planet back to 0
         self.updateSystemImage(pm,0.)
     def updateStarImage(self, pm):
         # there is no need to initialize the star image to 0's because the radius is always 1
         centerRow = int(pm.starImage.shape[0]/2)
         centerCol = int(pm.starImage.shape[1]/2)
+        maxBright = 1.
+        if pm.planBright > maxBright: maxBright = pm.planBright
+        if pm.diskBright > maxBright: maxBright = pm.diskBright
+        self.pixelScale = 65535./maxBright
         # determine the step size per pixel for a circle of radius = 1
         step = pm.stepSize
         xs = np.double(-1)
@@ -212,25 +264,31 @@ class App_Window(tkinter.Tk):
                 # distance^2 from star center
                 rs2 = xs*xs + ys*ys
                 yPixel = centerCol + int(ys/step)
-                pm.starImage[xPixel][yPixel] = int(200.*self.limbDarkFactor(rs2))
+                pixelValue = int(self.pixelScale*self.limbDarkFactor(rs2))
+                if pixelValue <= 0: pixelValue = 1
+                elif pixelValue > 65535: pixelValue = 65535
+                pm.starImage[xPixel][yPixel] = np.uint16(pixelValue)
                 ys += step
             xs += step
         # define the luminosity normalization if it hasn't been done
         if pm.luminosityNorm < 0:
-            pm.luminosityNorm = np.double(1/(200.*np.double(np.count_nonzero(pm.starImage))))
+            pm.luminosityNorm = np.double(1/(self.pixelScale*np.double(np.count_nonzero(pm.starImage))))
         pm.starLuminosity = np.double(np.sum(pm.starImage))*pm.luminosityNorm
     def updatePlanetImage(self,pm):
         # reset to 0
         pm.planetImage.fill(0)
+        maxBright = 1.
+        if pm.planBright > maxBright: maxBright = pm.planBright
+        if pm.diskBright > maxBright: maxBright = pm.diskBright
+        self.pixelScale = 65535./maxBright
         centerRow = pm.planetImage.shape[0]/2
         centerCol = pm.planetImage.shape[1]/2
         step = pm.stepSize
         # scale the planet radius to the star radius
-        planRad = pm.planetRadius / pm.starRadius
+        planRad = pm.planRadius / pm.starRadius
         pr2 = planRad * planRad
         xp = -planRad
-        isStar = (pm.planetBrightness > 0)
-        maxVal = 0
+        isStar = (pm.planBright > 0)
         while xp < planRad:
             xPixel = int(centerRow + xp/step)
             ymax = np.sqrt(pr2 - xp*xp)
@@ -242,40 +300,47 @@ class App_Window(tkinter.Tk):
                 if isStar: 
                     # apply limb-darkening to the 2ndry star
                     rp2 = xp*xp + yp*yp
-                    pixelValue = int(200.*self.limbDarkFactor(rp2/pr2)*pm.planetBrightness)
-                    if pixelValue == 0: pixelValue = 1
-                    if pixelValue > maxVal:
-                        maxVal = pixelValue
-                pm.planetImage[xPixel][yPixel] = pixelValue
+                    pixelValue = int(self.pixelScale*self.limbDarkFactor(rp2/pr2)*pm.planBright)
+                    if pixelValue <= 0: pixelValue = 1
+                    elif pixelValue > 65535: pixelValue = 65535
+                pm.planetImage[xPixel][yPixel] = np.uint16(pixelValue)
                 yp += step
             xp += step
-        print("Planet pixel max val",maxVal)
-        # Add a dust disk?
-        if pm.featureState == 1 or pm.featureState == 2:
-            diskAngle = 30 * np.pi / 180
-            cs = np.cos(diskAngle)
-            sn = np.sin(diskAngle)
-            diskRad = 0.2 * pm.starRadius
-            diskDepth = 0.2 * diskRad
+        # Add a dustdisk?
+        if pm.featureState == 1 and pm.diskOuterRadius > 0:
+            diskRad = pm.diskOuterRadius * pm.starRadius
+            dr2 = diskRad*diskRad
+            diskIn = pm.diskInnerRadius * pm.starRadius
+            di2 = diskIn*diskIn
+            # define the rotation cosines
+            angle1 = pm.diskOrbitAngle * np.pi / 180.
+            cs1 = np.cos(angle1)
+            sn1 = np.sin(angle1)
+            angle2 = pm.diskInclination * np.pi / 180.
+            cs2 = np.cos(angle2)
+            sn2 = np.sin(angle2)
             xd = -diskRad
-            diskBrightness = 100
-            if pm.featureState == 2: diskBrightness = 1
-            diskCnt = 0
+            pixelValue = int(self.pixelScale*pm.diskBright)
+            if pixelValue <= 0: pixelValue = 1
+            elif pixelValue > 65535: pixelValue = 65535
             while xd < diskRad:
-                yd = -diskDepth
-                while yd < diskDepth:
-                    xp = xd/step
-                    yp = yd/step
-                    xrPixel = int(cs*xp + sn*yp + centerRow)
-                    yrPixel = int(-sn*xp + cs*yp + centerCol)
-                    pm.planetImage[xrPixel][yrPixel] = diskBrightness
-                    diskCnt += 1
+                ymax = np.sqrt(dr2 - xd*xd)
+                yd = -ymax
+                while yd < ymax:
+                    rd2 = yd*yd + xd*xd
+                    if rd2 < di2:
+                        yd += step
+                        continue
+                    xr1 =  cs1*xd + sn1*yd
+                    yr1 = -sn1*xd + cs1*yd
+                    xr2 =  cs2*xr1 + sn2*yr1
+                    yr2 = -sn2*xr1 + cs1*yr1
+                    xPixel = int(centerRow + xr2/step)
+                    yPixel = int(centerCol + yr2/step)
+                    pm.planetImage[xPixel][yPixel]=np.uint16(pixelValue)
                     yd += step
                 xd += step
-            if pm.featureState == 1:
-                print("Added a bright circumsecondary dust disk to the planet image of size 0.2 R_Star x 0.04 R_Star")
-            else:
-                print("Added a dark circumsecondary disk to the planet image of size 0.2 R_Star x 0.04 R_Star")
+            print("Added a dust disk to the planet image")
         # dust disk done
         sum = np.sum(pm.planetImage)
         pixCnt = np.count_nonzero(pm.planetImage)
@@ -295,20 +360,16 @@ class App_Window(tkinter.Tk):
             maxAngle = 360.
             if pm.planetLuminosity == 0:
                 maxAngle = 180
-            step = 1. # degree
-            # adjust the step size so that there will be at least a few occluded points in the transit curve
-            dang = 2.*pm.starRadius/pm.orbitalRadius
-            dang /= 20.
-            dang *= 180. / np.pi
-            if pm.orbitalRadius > 5.:
-                step = 0.1
-            print("step",step, "dang",dang)
+            # adjust the step size so that there will be about 20 occluded points in the transit curve
+            step = pm.starRadius/pm.planOrbitRadius
+            step /= 20.
+            step *= 180. / np.pi
             for angleDeg in np.arange(0.,maxAngle,step):
                 angle = angleDeg * np.pi/180.
-                xcp = -pm.orbitalRadius * np.cos(angle)
-                ycp = pm.orbitalRadius * np.sin(angle) * np.tan(pm.inclination*np.pi/180)
+                xcp = -pm.planOrbitRadius * np.cos(angle)
+                ycp = pm.planOrbitRadius * np.sin(angle) * np.tan(pm.inclination*np.pi/180)
                 rp2 = xcp*xcp + ycp*ycp
-                radCut2 = (1.0+pm.planetRadius)*(1.0+pm.planetRadius)
+                radCut2 = (1.0+pm.planRadius)*(1.0+pm.planRadius)
                 if rp2 < radCut2 and start < 0:
                     # the planet center position is within the star disk
                     start = angleDeg
@@ -339,19 +400,18 @@ class App_Window(tkinter.Tk):
         # updates the image of the star/planet system and sets the system luminosity
         # The first step is to see if the planet image is within the cartoon canvas.
         step = pm.stepSize
-        isPlanet = bool(pm.planetLuminosity == 0)
         planetInFront = bool(angleDeg < 180)
         angle = angleDeg * np.pi/180.
         # x, y position of the planet center viewed at the inclination angle in
         # coordinate system where RStar = 1.
-        xcp = -pm.orbitalRadius * np.cos(angle)
+        xcp = -pm.planOrbitRadius * np.cos(angle)
         # see if the planet center is outside the cartoon window
-        planetEdge = abs(xcp - pm.planetRadius)
+        planetEdge = abs(xcp - pm.planRadius)
         if planetEdge > 2.5:
             pm.systemImage = pm.starImage.copy()
             pm.systemLuminosity = pm.starLuminosity + pm.planetLuminosity
             return
-        ycp = pm.orbitalRadius * np.sin(angle) * np.tan(pm.inclination*np.pi/180)
+        ycp = pm.planOrbitRadius * np.sin(angle) * np.tan(pm.inclination*np.pi/180)
         # find the number of pixels to shift the planet position into the system image
         iyShift = int(xcp/step) + int(pm.systemImage.shape[1]/2 - pm.planetImage.shape[1]/2)
         ixShift = int(ycp/step)
@@ -391,11 +451,6 @@ class App_Window(tkinter.Tk):
                 iy = nzPixels[1][ii]
                 pm.systemImage[ix][iy]= pm.starImage[ix][iy]
         pm.systemLuminosity = np.double(np.sum(pm.systemImage))*pm.luminosityNorm
-#        print("system image updated")
-    def drawCartoon(self):
-        self.ims.set_data(pm.systemImage)
-        self.canvas2.draw()
-        self.canvas.flush_events()
     def run(self):
         # Run the model and update the screen with the results.
         if pm.zoomState > 1 and pm.planetLuminosity == 0:
@@ -404,20 +459,28 @@ class App_Window(tkinter.Tk):
         self.runBut.configure(text= '...')
         self.resetTransitCurve()
         start = time.time()
-        cnt = 0
         sysCnt = np.count_nonzero(pm.starImage)+np.count_nonzero(pm.planetImage)
         isPlanet = bool(pm.planetLuminosity == 0)
         self.luminosities.fill(pm.systemLuminosity)
         # guess at the transit curve Y limits
         ymax = pm.systemLuminosity + 0.001
         self.updateSystemImage(pm,90.)
-        ymin = pm.systemLuminosity - 0.001
+        ymin = pm.systemLuminosity
+        if pm.planetLuminosity > 0:
+            # find low value for a bright companion
+            self.updateSystemImage(pm,270.)
+            if pm.systemLuminosity < ymin:
+                ymin = pm.systemLuminosity
+        ymin -= 0.001
         self.F2Transit.set_ylim(ymin, ymax)
+        self.canvas2.draw()
+        self.canvas2.flush_events()
+        cnt = 0
         for angle in self.angles:
             if isPlanet and angle > 180:
                 break
             self.updateSystemImage(pm,angle)
-            self.drawCartoon()
+            self.ims.set_data(pm.systemImage)
             self.luminosities[cnt] = pm.systemLuminosity
             self.line2.set_ydata(self.luminosities)
             self.canvas2.draw()
@@ -428,11 +491,17 @@ class App_Window(tkinter.Tk):
         self.UpdateRunInfo()
         self.runBut.configure(text='Run')
         self.updateTransitCurve()
+    def resetCanvas2(self):
+        self.updateStarImage(pm)
+        self.updatePlanetImage(pm)
+        self.updateSystemImage(pm, 0.)
+        self.ims.set_data(pm.systemImage)
+        self.UpdateRunInfo()
+        self.resetTransitCurve()
+        self.setAngleRange()
     def resetTransitCurve(self):
-        self.luminosities.fill(pm.starLuminosity+pm.planetLuminosity)
-        self.line2.set_ydata(self.luminosities)
-        self.canvas2.draw()
-        self.canvas2.flush_events()
+        self.luminosities.fill(0.)
+        self.updateTransitCurve()
     def updateTransitCurve(self):
         # update the transit curve
         self.line2.set_xdata(self.angles)
@@ -460,7 +529,6 @@ class App_Window(tkinter.Tk):
             ya[indx] = self.limbDarkFactor(r2)
             indx += 1
         self.line1.set_ydata(ya)
-        self.F2Cartoon.imshow(pm.systemImage, cmap="gray", vmin=0, vmax=255)
         self.canvas.draw()
         self.canvas.flush_events()
     def addFeature(self):
@@ -468,12 +536,15 @@ class App_Window(tkinter.Tk):
         if pm.featureState == 0:
             self.featureText.set("No feature")
         elif pm.featureState == 1:
-            self.featureText.set("Bright dust disk")
+            if pm.diskOuterRadius == 0.:
+                print("Dust disk model inputs haven't been loaded.")
+            else:
+                self.featureText.set("Dust disk")
         else:
-            self.featureText.set("Dark dust disk")
-        self.updatePlanetImage(pm)
-        self.updateSystemImage(pm, 0.)
-        self.drawCartoon()
+            self.featureText.set("Future feature")
+#        self.updatePlanetImage(pm)
+#        self.updateSystemImage(pm, 0.)
+        self.resetCanvas2()
     def zoomTransit(self):
         pm.zoomState = (pm.zoomState+1) % 3
         if pm.zoomState == 0:
@@ -498,7 +569,7 @@ class App_Window(tkinter.Tk):
             print("The inclination angle must be between 0 and 90 degrees")
             self.planInclEntry.config(bg="red")
             return False
-        maxInclination = 180*math.atan((1+pm.planetRadius)/pm.orbitalRadius)/np.pi
+        maxInclination = 180*math.atan((pm.starRadius+pm.planRadius)/pm.planOrbitRadius)/np.pi
         if (inclin > maxInclination):
             mess = "The inclination angle should be less than {:.0f} degrees to see a transit".format(maxInclination)
             print(mess)
@@ -506,6 +577,7 @@ class App_Window(tkinter.Tk):
             return False
         self.planInclEntry.config(bg="white")
         pm.inclination = inclin
+        self.planInclEntry.config(textvariable=tkinter.StringVar(value=pm.inclination))
         self.resetTransitCurve()
         return True
     def validateNoise(self, event):
@@ -521,9 +593,10 @@ class App_Window(tkinter.Tk):
             return False
         self.noiseEntry.config(bg="white")
         pm.noise = noise
+        self.noiseEntry.config(textvariable=tkinter.StringVar(value=pm.noise))
         self.updateTransitCurve()
         return True
-    def validatePlanetBrightness(self, event):
+    def validatePlanBright(self, event):
         # planet brightness
         try:
             planBright = float(self.planBrightEntry.get())
@@ -534,40 +607,29 @@ class App_Window(tkinter.Tk):
             print("The planet brightness can't be < 0")
             self.planBrightEntry.config(bg="red")
             return False
+        pm.planBright = planBright
         self.planBrightEntry.config(bg="white")
-        if planBright > 1:
-            print("Companion star central brightness = {:.1f}".format(planBright))
-            print("Rescale luminosity normalization")
-        pm.planetBrightness = planBright
-        self.updatePlanetImage(pm)
-        self.updateSystemImage(pm, 0.)
-        self.UpdateRunInfo()
-        self.drawCartoon()
-        self.resetTransitCurve()
-        self.setAngleRange()
+        self.planBrightEntry.config(textvariable=tkinter.StringVar(value=pm.planBright))
+        self.resetCanvas2()
         return True
-    def validateOrbitalRadius(self, event):
+    def validatePlanOrbitRadius(self, event):
         # orbital radius
         try:
-            orbRad = float(self.orbRadEntry.get())
+            orbRad = float(self.planOrbitRadiusEntry.get())
         except:
-            self.orbRadEntry.config(bg="red")
+            self.planOrbitRadiusEntry.config(bg="red")
             return False
-        self.orbRadEntry.config(bg="white")
         # ensure that the planet isn't inside the star
-        if orbRad < pm.starRadius + pm.planetRadius:
+        if orbRad < pm.starRadius + pm.planRadius:
             print("The planet orbital radius must be > R_Star + R_Planet")
-            self.orbRadEntry.config(bg="red")
+            self.planOrbitRadiusEntry.config(bg="red")
             return False
-        pm.orbitalRadius = orbRad
-        self.updatePlanetImage(pm)
-        self.updateSystemImage(pm, 0.)
-        self.UpdateRunInfo()
-        self.drawCartoon()
-        self.resetTransitCurve()
-        self.setAngleRange()
+        pm.planOrbitRadius = orbRad
+        self.planOrbitRadiusEntry.config(bg="white")
+        self.planOrbitRadiusEntry.config(textvariable=tkinter.StringVar(value=orbRad))
+        self.resetCanvas2()
         return True
-    def validatePlanetRadius(self, event):
+    def validatePlanRadius(self, event):
         # planet radius
         try:
             planRad = float(self.planRadEntry.get())
@@ -580,13 +642,9 @@ class App_Window(tkinter.Tk):
             self.planRadEntry.config(bg="red")
             return False
         self.planRadEntry.config(bg="white")
-        pm.planetRadius = planRad
-        self.updatePlanetImage(pm)
-        self.updateSystemImage(pm,0.)
-        self.UpdateRunInfo()
-        self.drawCartoon()
-        self.resetTransitCurve()
-        self.setAngleRange()
+        pm.planRadius = planRad
+        self.planRadEntry.config(textvariable=tkinter.StringVar(value=pm.planRadius/RJupiterToRSun))
+        self.resetCanvas2()
         return True
     def validateStarRadius(self, event):
         try:
@@ -602,13 +660,8 @@ class App_Window(tkinter.Tk):
         else:
             self.starRadEntry.config(bg="white")
         pm.starRadius = srad
-        self.updateStarImage(pm)
-        self.updatePlanetImage(pm)
-        self.updateSystemImage(pm, 0.)
-        self.UpdateRunInfo()
-        self.drawCartoon()
-        self.resetTransitCurve()
-        self.setAngleRange()
+        self.starRadEntry.config(textvariable=tkinter.StringVar(value=srad))
+        self.resetCanvas2()
         return True
     def validateLDF(self, event):
         try:
@@ -622,16 +675,11 @@ class App_Window(tkinter.Tk):
             return False
         else:
             self.ldfEntry.config(bg="white")
+        print("LDF old",pm.LDF,"new",ldf)
         pm.LDF = ldf
-        self.updateStarImage(pm)
-        # the planet image only needs updating if the current planetLuminosity is > 0
-        if pm.planetLuminosity > 0:
-            self.updatePlanetImage(pm)
-        self.updateSystemImage(pm, 0.)
-        self.UpdateRunInfo()
-        self.drawCartoon()
+        self.ldfEntry.config(textvariable=tkinter.StringVar(value=ldf))
+        self.resetCanvas2()
         self.plotLDF()
-        self.resetTransitCurve()
         return True
     def limbDarkFactor(self, radialDistance2):
         # calculate the limb-darkening factor at given radial distance^2 with a given limbDark factor.
@@ -642,11 +690,11 @@ class App_Window(tkinter.Tk):
 
 if __name__ == "__main__":
     MainWindow = App_Window(None)
-    str = "Hit return key after changing a variable to update the model.\n\n"
-    str += "Hit Run button after you are done to start the animation.\n\n"
+    '''
+    str = "Hit the return key after changing a variable to update the model.\n\n"
+    str += "Hit the Run button after you are done to start the animation.\n\n"
     str += "Hitting the return key in the 'noise rms' field randomizes the noise."
     tkinter.messagebox.showinfo(message=str)
-#    tkinter.messagebox.showinfo(message="Hit the <return> key after changing a variable to update the model.\n \
-#        Hit <Run> after you are done to model the transit")
+    '''
     MainWindow.mainloop()
 
