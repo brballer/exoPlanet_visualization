@@ -16,7 +16,6 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg)
 from matplotlib.ticker import (MultipleLocator)
 from systemModel import SystemModel
 from os.path import exists
-import time
 
 # planet radius RJupiter to RSun
 RJupiterToRSun = 0.10047
@@ -49,40 +48,43 @@ class App_Window(tkinter.Tk):
                     continue
                 split1 = line.split('#')
                 split2 = split1[0].split(':')
+                valFloat = float(split2[1])
                 if line.startswith('diskOuterRadius'):
-                    pm.diskOuterRadius = float(split2[1])
+                    pm.diskOuterRadius = valFloat
                 elif line.startswith('diskInnerRadius'):
-                    pm.diskInnerRadius = float(split2[1])
+                    pm.diskInnerRadius = valFloat
+                elif line.startswith('diskThick'):
+                    pm.diskThick = valFloat
                 elif line.startswith('diskBright'):
-                    pm.diskBright = float(split2[1])
+                    pm.diskBright = valFloat
                 elif line.startswith('diskInclination'):
-                    pm.diskInclination = float(split2[1])
+                    pm.diskInclination = valFloat
                 elif line.startswith('diskOrbitAngle'):
-                    pm.diskOrbitAngle = float(split2[1])
+                    pm.diskOrbitAngle = valFloat
                 elif line.startswith('planRadius'):
-                    pr = float(split2[1])
+                    pr = valFloat
                     pm.planRadius = pr*RJupiterToRSun
                     self.planRadEntry.config(textvariable=tkinter.StringVar(value=pr))
                 elif line.startswith('planOrbitRadius'):
-                    pm.planOrbitRadius = float(split2[1])
+                    pm.planOrbitRadius = valFloat
                     self.planOrbitRadiusEntry.config(textvariable = tkinter.StringVar(value=pm.planOrbitRadius))
                 elif line.startswith('planBright'):
-                    pm.planBright = float(split2[1])
+                    pm.planBright = valFloat
                     self.planBrightEntry.config(textvariable = tkinter.StringVar(value=pm.planBright))
                 elif line.startswith('starRadius'):
-                    pm.starRadius = float(split2[1])
+                    pm.starRadius = valFloat
                     self.starRadEntry.config(textvariable=tkinter.StringVar(value=pm.starRadius))
-                elif line.startswith('LDF'):
-                    pm.LDF = float(split2[1])
-                    self.ldfEntry.config(textvariable=tkinter.StringVar(value=pm.LDF))
+                elif line.startswith('LDC'):
+                    pm.LDC = valFloat
+                    self.LDCEntry.config(textvariable=tkinter.StringVar(value=pm.LDC))
                 else:
                     print("unrecognized line",line)
             inFile.close()
-            print("Loaded system model inputs from 'modelInputs.txt'")
-            self.plotLDF()
+            print("Loaded system model inputs")
+            self.plotLDC()
             self.resetCanvas2()
     def initialize(self):
-        self.title("ExoTransit_Visualization V2.0")
+        self.title("ExoTransit_Visualization V2.1")
         self.geometry("1100x800")
         # scaling from brightness to pixel value = uint16/2
         self.pixelScale = 65535
@@ -95,8 +97,8 @@ class App_Window(tkinter.Tk):
        # place the entry fields
         ypo = 30
         xpo1 = 0
-        xpo2 = 200
-        xpo3 = 300
+        xpo2 = 220
+        xpo3 = 320
         self.lbl0 = tkinter.Label(self, text = "Star radius (R_star)")
         self.lbl01 = tkinter.Label(self, text = "in units of R_Sun")
         self.starRadEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=pm.starRadius), width = 8)
@@ -105,12 +107,12 @@ class App_Window(tkinter.Tk):
         self.starRadEntry.place(x=xpo2, y=ypo)
         self.lbl01.place(x=xpo3,y=ypo)
         ypo += 25
-        self.lbl1 = tkinter.Label(self, text = "Limb-darkening factor (LDF)")
-        self.lbl11 = tkinter.Label(self, text = "0 (none) < LDF < 1")
-        self.ldfEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=pm.LDF), width = 8)
-        self.ldfEntry.bind("<Return>",self.validateLDF)
+        self.lbl1 = tkinter.Label(self, text = "Limb-Darkening Coefficient (LDC)")
+        self.lbl11 = tkinter.Label(self, text = "0 (none) < LDC < 1")
+        self.LDCEntry = tkinter.Entry(bd=3, textvariable = tkinter.StringVar(value=pm.LDC), width = 8)
+        self.LDCEntry.bind("<Return>",self.validateLDC)
         self.lbl1.place(x=xpo1, y=ypo)
-        self.ldfEntry.place(x=xpo2, y=ypo)
+        self.LDCEntry.place(x=xpo2, y=ypo)
         self.lbl11.place(x=xpo3, y=ypo)
         #
         ypo += 25
@@ -171,6 +173,11 @@ class App_Window(tkinter.Tk):
         self.featureText.set("Add feature")
         self.featurebutton=tkinter.Button(self, textvariable=self.featureText, command=self.addFeature)
         self.featurebutton.place(x=xpo1+200, y=ypo)
+        # add the export button
+        self.exportText = tkinter.StringVar()
+        self.exportText.set("Export data")
+        self.exportText=tkinter.Button(self, textvariable=self.exportText, command=self.export)
+        self.exportText.place(x=xpo1+300, y=ypo)
         # quit button at the top
         self.b3=tkinter.Button(self, text="Quit", command=self.appQuit)
         self.b3.pack(anchor="nw")
@@ -179,7 +186,7 @@ class App_Window(tkinter.Tk):
         # read in system inputs
         # add some informational text fields
         ypo += 30
-        daggerTxt = tkinter.Label(self, text = "\u2020 Note: Star central brightness, B(r=0) = 0, by definition.  (Luminosity = \u222B B(r) LDF(r) dA)")
+        daggerTxt = tkinter.Label(self, text = "\u2020 Note: Star central brightness, B(r=0) = 0, by definition.  (Luminosity = \u222B B(r) LDC(r) dA)")
         daggerTxt.place(x=xpo1, y=ypo)
         ypo += 20
         self.starLumTxt = tkinter.Label(self, text = "Star luminosity = UNDEFINED")
@@ -198,7 +205,7 @@ class App_Window(tkinter.Tk):
         Fig = Figure(figsize=(5.5,3.5),dpi=100)
         FigSubPlot = Fig.add_subplot(111)
         FigSubPlot.set_xlabel("Radius Fraction")
-        FigSubPlot.set_ylabel("LDF Brightness")
+        FigSubPlot.set_ylabel("LDC Brightness")
         FigSubPlot.set_xlim(0, 1.1)
         FigSubPlot.set_ylim(0, 1.1)
         Fig.tight_layout()
@@ -308,39 +315,64 @@ class App_Window(tkinter.Tk):
             xp += step
         # Add a dustdisk?
         if pm.featureState == 1 and pm.diskOuterRadius > 0:
+            # construct a 3D rotation matrix using Euler angles.
+            # the angle wrt the planet orbital plane, alpha
+            alpha = pm.diskOrbitAngle * np.pi/180.
+            ca = np.cos(alpha)
+            sa = np.sin(alpha)
+            # the inclination angle of the planet orbital plane, beta
+            beta = (90 - pm.diskInclination) * np.pi/180.
+            cb = np.cos(beta)
+            sb = np.sin(beta)
+            # the third rotation angle, gamma, is around the disk axis (Z) which isn't relevant
+            cg = 1.0
+            sg = 0.0
+            # Ref https://en.wikipedia.org/wiki/Rotation_matrix
+            rotMat = np.array([[cb*cg, sa*sb*cg-ca*sg, ca*sb*cg+sa*sg],
+                               [cb*sg, sa*sb*sg+ca*cg, ca*sb*sg-sa*cg],
+                               [-sb, sa*cb, ca*cb]])
+            # find the image pixel loop bounds
             diskRad = pm.diskOuterRadius * pm.starRadius
             dr2 = diskRad*diskRad
             diskIn = pm.diskInnerRadius * pm.starRadius
             di2 = diskIn*diskIn
-            # define the rotation cosines
-            angle1 = pm.diskOrbitAngle * np.pi / 180.
-            cs1 = np.cos(angle1)
-            sn1 = np.sin(angle1)
-            angle2 = pm.diskInclination * np.pi / 180.
-            cs2 = np.cos(angle2)
-            sn2 = np.sin(angle2)
             xd = -diskRad
+            # disk thickness
+            zmax = 0.5 * pm.diskThick * diskRad
+            if (zmax < step): zmax = step
+            # this assumes that the disk is uniformly bright
             pixelValue = int(self.pixelScale*pm.diskBright)
             if pixelValue <= 0: pixelValue = 1
             elif pixelValue > 65535: pixelValue = 65535
+            pixelVal16 = np.uint16(pixelValue)
+            # iterate over all the pixels in the 3D ring model
             while xd < diskRad:
                 ymax = np.sqrt(dr2 - xd*xd)
                 yd = -ymax
                 while yd < ymax:
                     rd2 = yd*yd + xd*xd
                     if rd2 < di2:
+                        # this point is less than the ring inner radius so ignore it
                         yd += step
                         continue
-                    xr1 =  cs1*xd + sn1*yd
-                    yr1 = -sn1*xd + cs1*yd
-                    xr2 =  cs2*xr1 + sn2*yr1
-                    yr2 = -sn2*xr1 + cs1*yr1
-                    xPixel = int(centerRow + xr2/step)
-                    yPixel = int(centerCol + yr2/step)
-                    pm.planetImage[xPixel][yPixel]=np.uint16(pixelValue)
+                    # iterate over the disk thickness
+                    zd = -zmax
+                    ringInFront = bool(xd<0)
+                    while zd < zmax:
+                        # Rotate the position (xd, yd, zd) in 3D
+                        pixelPos = np.array([xd, yd, zd])
+                        # and project into 2D
+                        rotPixelPos = np.dot(rotMat, pixelPos)
+                        # Convert to pixel location offset from the image center
+                        xPixel = int(centerRow + rotPixelPos[0]/step)
+                        yPixel = int(centerCol + rotPixelPos[1]/step)
+                        if pm.planetImage[xPixel][yPixel] == 0: 
+                            pm.planetImage[xPixel][yPixel] = pixelVal16
+                        elif ringInFront:
+                            pm.planetImage[xPixel][yPixel] = pixelVal16
+                        zd += step
                     yd += step
                 xd += step
-            print("Added a dust disk to the planet image")
         # dust disk done
         sum = np.sum(pm.planetImage)
         pixCnt = np.count_nonzero(pm.planetImage)
@@ -377,8 +409,7 @@ class App_Window(tkinter.Tk):
                     nt += 1
                     if nt == pm.zoomState:
                         # pad the angle range
-                        pad = 0.3 * (angleDeg - start)
-                        print("transit",start,angleDeg,pad)
+                        pad = 0.5 * (angleDeg - start)
                         start = round(start-pad)
                         end = round(angleDeg+pad)
                         if start == angleDeg:
@@ -454,11 +485,9 @@ class App_Window(tkinter.Tk):
     def run(self):
         # Run the model and update the screen with the results.
         if pm.zoomState > 1 and pm.planetLuminosity == 0:
-            print("No secondary transit is expected")
             return
         self.runBut.configure(text= '...')
         self.resetTransitCurve()
-        start = time.time()
         sysCnt = np.count_nonzero(pm.starImage)+np.count_nonzero(pm.planetImage)
         isPlanet = bool(pm.planetLuminosity == 0)
         self.luminosities.fill(pm.systemLuminosity)
@@ -486,8 +515,6 @@ class App_Window(tkinter.Tk):
             self.canvas2.draw()
             self.canvas2.flush_events()
             cnt += 1
-        end = time.time()
-        print("cpu time {:.2f} s".format(end-start))
         self.UpdateRunInfo()
         self.runBut.configure(text='Run')
         self.updateTransitCurve()
@@ -519,7 +546,7 @@ class App_Window(tkinter.Tk):
         self.F2Transit.set_ylim(loY, hiY)
         self.canvas2.draw()
         self.canvas2.flush_events()
-    def plotLDF(self):
+    def plotLDC(self):
         # Get the entries in the text fields and validate
         ra = np.linspace(0, 1, 50)
         ya = np.zeros(50)
@@ -542,9 +569,18 @@ class App_Window(tkinter.Tk):
                 self.featureText.set("Dust disk")
         else:
             self.featureText.set("Future feature")
-#        self.updatePlanetImage(pm)
-#        self.updateSystemImage(pm, 0.)
         self.resetCanvas2()
+    def export(self):
+        outFile = open("transit.csv","w")
+        cnt = 0
+        for angle in self.angles:
+            outFile.write("{:.2f}".format(angle))
+            outFile.write(",")
+            outFile.write(" {:.5f}".format(self.luminosities[cnt]))
+            outFile.write("\n")
+            cnt += 1
+        outFile.close()
+        print("Exported transit curve to transit.csv")
     def zoomTransit(self):
         pm.zoomState = (pm.zoomState+1) % 3
         if pm.zoomState == 0:
@@ -552,10 +588,12 @@ class App_Window(tkinter.Tk):
         elif pm.zoomState == 1:
             self.zoomText.set("Zoom Primary transit")
         elif pm.zoomState == 2:
-            self.zoomText.set("Zoom 2ndry transit")
-        else:
-            self.zoomText.set("???")
-        # testing
+            if pm.planetLuminosity > 0:
+                self.zoomText.set("Zoom 2ndry transit")
+            else:
+                print("No secondary transit is expected")
+                pm.zoomState = 0
+                self.zoomText.set("Zoom")
         # Set the angle range for the current zoom state
         self.setAngleRange()
     def validateInclination(self, event):
@@ -663,29 +701,29 @@ class App_Window(tkinter.Tk):
         self.starRadEntry.config(textvariable=tkinter.StringVar(value=srad))
         self.resetCanvas2()
         return True
-    def validateLDF(self, event):
+    def validateLDC(self, event):
         try:
-            ldf = float(self.ldfEntry.get())
+            LDC = float(self.LDCEntry.get())
         except:
-            self.ldfEntry.config(bg="red")
+            self.LDCEntry.config(bg="red")
             return False
-        if (ldf < 0 or ldf > 1): 
-            print("The limb-darkening factor must be between 0 and 1")
-            self.ldfEntry.config(bg="red")
+        if (LDC < 0 or LDC > 1): 
+            print("The limb-darkening coefficient must be between 0 and 1")
+            self.LDCEntry.config(bg="red")
             return False
         else:
-            self.ldfEntry.config(bg="white")
-        print("LDF old",pm.LDF,"new",ldf)
-        pm.LDF = ldf
-        self.ldfEntry.config(textvariable=tkinter.StringVar(value=ldf))
+            self.LDCEntry.config(bg="white")
+        print("LDC old",pm.LDC,"new",LDC)
+        pm.LDC = LDC
+        self.LDCEntry.config(textvariable=tkinter.StringVar(value=LDC))
         self.resetCanvas2()
-        self.plotLDF()
+        self.plotLDC()
         return True
     def limbDarkFactor(self, radialDistance2):
         # calculate the limb-darkening factor at given radial distance^2 with a given limbDark factor.
         if (radialDistance2 < 0 or radialDistance2 > 1): return 0
         arg = 1 - radialDistance2
-        arg = 1 - pm.LDF * (1 - np.sqrt(arg))
+        arg = 1 - pm.LDC * (1 - np.sqrt(arg))
         return arg
 
 if __name__ == "__main__":

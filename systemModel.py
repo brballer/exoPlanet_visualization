@@ -3,10 +3,10 @@ import math
 import numpy as np
 
 class SystemModel():
-    def __init__(self, starRadIn, orbRadIn, planRadIn, planBrightIn, inclinIn, ldfIn):
+    def __init__(self, starRadIn, orbRadIn, planRadIn, planBrightIn, inclinIn, LDCIn):
         # class constructor of a star and single planet system.
         # The star has a radius of 1 and a central brightness of 1. The integrated star luminosity is reduced if a
-        # limb-darkening factor LDF is > 0. A "planet" in the code is a true planet if the planetBrightness = 0.
+        # limb-darkening factor LDC is > 0. A "planet" in the code is a true planet if the planetBrightness = 0.
         # Eclipsing binary stars are modeled by setting planetBrightness > 0. 
         self.systemImage = np.zeros((256,512), np.uint16)
         self.starImage = np.zeros((256,512), np.uint16)
@@ -15,10 +15,11 @@ class SystemModel():
         self.planRadius = np.double(planRadIn) # in units of RSun
         self.planOrbitRadius = np.double(orbRadIn) # in units of RSun
         self.planBright = planBrightIn
-        self.LDF = np.float(ldfIn)
+        self.LDC = np.float(LDCIn)
         self.inclination = np.float(inclinIn) # in degrees
         self.diskOuterRadius = 0
         self.diskInnerRadius = 0
+        self.diskThick = 0
         self.diskBright = 0
         self.diskInclination = 0 # degrees
         self.diskOrbitAngle = 0

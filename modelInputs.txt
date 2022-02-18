@@ -2,14 +2,15 @@
 # Comment lines like this one are ignored
 # ------ Star variables ------
 starRadius: 1.0 # in units of R_Sun
-LDF: 0.6 # Limb Darkening Factor
+LDC: 0.5 # Limb Darkening Coefficient
 # ------ Planet variables ------
 planRadius: 1.0 # R_Jupiter
-planOrbitRadius: 2.0 # R_star
+planOrbitRadius: 1.75 # R_star
 planBright: 1.5 # units of star central brightness = 1
-# ------ Binary companion dust disk variables------
+# ------ Feature: Planet dust disk definition ------
 diskOuterRadius: 0.5 # units of star radius
-diskInnerRadius: 0.2 # units of star radius
+diskInnerRadius: 0.3 # units of star radius
+diskThick: 0.2 # units of diskOuterRadius
 diskBright: 0.6 # units of star brightness (=1)
-diskInclination: 30. # degrees
-diskOrbitAngle: 80. # degrees
+diskInclination: 40. # degrees
+diskOrbitAngle: 60. # degrees
